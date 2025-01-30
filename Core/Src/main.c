@@ -19,9 +19,10 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 
+
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "Thruster.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -51,8 +52,9 @@ TIM_HandleTypeDef htim3;
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
-uint8_t buf[14];
-uint8_t data_vma[14];
+uint8_t buf[28];
+uint16_t data_vma[12];
+uint8_t rxFlag=0;
 uint8_t v_bat = 0;
 /* USER CODE END PV */
 
@@ -112,7 +114,9 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
-  HAL_UART_Receive_IT(&huart1, buf, 14);
+  HAL_UART_Receive_IT(&huart1, buf, 28);
+  Thruster_Init();
+
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
@@ -121,6 +125,10 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+	  if(rxFlag == 1){
+		  Thruster_Set_Speed(data_vma);
+		  rxFlag = 0;
+	  }
 
   }
   /* USER CODE END 3 */
@@ -520,6 +528,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 		data_vma[9]= buf[12];
 		data_vma[10]= buf[13];
 		data_vma[11]= buf[14];
+		rxFlag = 1;
 	}
 	HAL_UART_Receive_IT(&huart1, buf, 14);
 }
