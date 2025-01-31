@@ -19,10 +19,10 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 
-
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "Thruster.h"
+#include "hydrolib_ring_queue.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -50,23 +50,26 @@ TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
 
 UART_HandleTypeDef huart1;
+DMA_HandleTypeDef hdma_usart1_rx;
 
 /* USER CODE BEGIN PV */
-uint8_t buf[28];
-uint16_t data_vma[12];
-uint8_t rxFlag=0;
-uint8_t v_bat = 0;
+uint8_t buffer_RX[32];
+uint8_t buffer_ring[64];
+hydrolib_RingQueue ringQueue;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_DMA_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_TIM1_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_ADC1_Init(void);
+
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -105,6 +108,7 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_I2C1_Init();
   MX_TIM1_Init();
   MX_TIM2_Init();
@@ -112,11 +116,9 @@ int main(void)
   MX_USART1_UART_Init();
   MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
-
+ hydrolib_RingQueue_Init(&ringQueue, buffer_ring, sizeof(buffer_ring));
+ HAL_UARTEx_ReceiveToIdle_DMA(&huart1, buffer_RX, 32);
   /* USER CODE END 2 */
-  HAL_UART_Receive_IT(&huart1, buf, 28);
-  Thruster_Init();
-
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
@@ -125,10 +127,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  if(rxFlag == 1){
-		  Thruster_Set_Speed(data_vma);
-		  rxFlag = 0;
-	  }
+	  ProcessUARTData();
 
   }
   /* USER CODE END 3 */
@@ -494,6 +493,22 @@ static void MX_USART1_UART_Init(void)
 }
 
 /**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA1_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA1_Channel5_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Channel5_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Channel5_IRQn);
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -513,25 +528,37 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 
-	if((buf[0] == 0xff) && (buf[1] == 0xfd)){
-		data_vma[0]= buf[3];
-		data_vma[1]= buf[4];
-		data_vma[2]= buf[5];
-		data_vma[3]= buf[6];
-		data_vma[4]= buf[7];
-		data_vma[5]= buf[8];
-		data_vma[6]= buf[9];
-		data_vma[7]= buf[10];
-		data_vma[8]= buf[11];
-		data_vma[9]= buf[12];
-		data_vma[10]= buf[13];
-		data_vma[11]= buf[14];
-		rxFlag = 1;
+void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
+
+	if (huart->Instance == USART1) {  // Проверяем, что это нужный UART
+		hydrolib_RingQueue_Push(&ringQueue, buffer_RX, Size); // Копируем данные в кольцевой буфер
+
+		// Перезапускаем UART DMA
+		HAL_UARTEx_ReceiveToIdle_DMA(&huart1, buffer_RX, sizeof(buffer_RX));
+		__HAL_DMA_ENABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
 	}
-	HAL_UART_Receive_IT(&huart1, buf, 14);
 }
+
+void ProcessUARTData() {
+	int16_t startIdx = hydrolib_RingQueue_Find2BytesLE(&ringQueue, 0XFFFD, 0);
+
+	while (startIdx >= 0) {
+		uint8_t packet[12];
+
+		if (hydrolib_RingQueue_GetLength(&ringQueue) >= 15) {
+			hydrolib_RingQueue_Read(&ringQueue, packet, 12, startIdx);
+			Thruster_Set_Speed(packet);
+			hydrolib_RingQueue_Drop(&ringQueue, startIdx);
+		} else {
+			break;  // Ждём, когда будет 15 байтов
+		}
+
+		startIdx = hydrolib_RingQueue_Find2BytesLE(&ringQueue, 0XFFFD, 0); // Ищем следующий пакет
+	}
+
+}
+
 
 /* USER CODE END 4 */
 

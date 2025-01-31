@@ -31,7 +31,7 @@ void Thruster_Init()
 
 void Thruster_Stop()
 {
-	int speed = 200;
+	int speed = 150;
 
 	__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, speed);
 	__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, speed);
@@ -63,18 +63,9 @@ void Thruster_Set_Speed(uint16_t* speed)
 	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_4, speed[11]);
 }
 
-void Thruster_Set_Perc(int *speed)
-{
-//	int sec_speed[8];
-//	for(int i = 0;i<8;i++)
-//	{
-//		if((speed[i]<100)&&(speed[i]>-100))
-//			sec_speed[i] = speed[i]*kpercsec+150;
-//		else
-//			sec_speed[i] = 150;
-//	}
-//	sec_speed[4] = 200;
 
-	Thruster_Set_Speed(speed);
-
+void Process_data(uint16_t *speed){
+	if((speed[0] == 0xFF) && (speed[1] == 0xFD)){
+		Thruster_Set_Speed(speed +2);
+	}
 }
