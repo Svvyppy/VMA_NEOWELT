@@ -546,7 +546,7 @@ void ProcessUARTData() {
 	while (startIdx >= 0) {
 		uint8_t packet[12];
 
-		if (hydrolib_RingQueue_GetLength(&ringQueue) >= 15) {
+		if (hydrolib_RingQueue_GetLength(&ringQueue) >= 15) { //воруем дату и кидаем ее на движки
 			hydrolib_RingQueue_Read(&ringQueue, packet, 12, startIdx);
 			Thruster_Set_Speed(packet);
 			hydrolib_RingQueue_Drop(&ringQueue, startIdx);
