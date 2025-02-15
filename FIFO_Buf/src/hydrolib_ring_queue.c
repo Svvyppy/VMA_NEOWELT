@@ -205,28 +205,6 @@ uint16_t hydrolib_RingQueue_FindByte(hydrolib_RingQueue *self, uint8_t target_by
     return -1;
 }
 
-uint16_t hydrolib_RingQueue_Find2BytesLE(hydrolib_RingQueue *self, uint16_t target_bytes, uint16_t shift)
-{
-    for (uint16_t i = shift; i < self->length; i++)
-    {
-        uint16_t current_index = (self->head + i) % self->capacity;
-        uint16_t current_data;
-        if (current_index == self->capacity - 1)
-        {
-            current_data = self->buffer[current_index] | self->buffer[0] << 8;
-        }
-        else
-        {
-            current_data = *(uint16_t *)(self->buffer + current_index);
-        }
-        if (current_data == target_bytes)
-        {
-            return i;
-        }
-    }
-    return -1;
-}
-
 uint16_t hydrolib_RingQueue_Find4BytesLE(hydrolib_RingQueue *self, uint32_t target_bytes, uint16_t shift)
 {
     for (uint16_t i = shift; i < self->length; i++)

@@ -1,20 +1,20 @@
 /* USER CODE BEGIN Header */
 /**
-  ******************************************************************************
-  * @file           : main.c
-  * @brief          : Main program body
-  ******************************************************************************
-  * @attention
-  *
-  * Copyright (c) 2025 STMicroelectronics.
-  * All rights reserved.
-  *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
-  *
-  ******************************************************************************
-  */
+ ******************************************************************************
+ * @file           : main.c
+ * @brief          : Main program body
+ ******************************************************************************
+ * @attention
+ *
+ * Copyright (c) 2025 STMicroelectronics.
+ * All rights reserved.
+ *
+ * This software is licensed under terms that can be found in the LICENSE file
+ * in the root directory of this software component.
+ * If no LICENSE file comes with this software, it is provided AS-IS.
+ *
+ ******************************************************************************
+ */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
@@ -41,8 +41,6 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-ADC_HandleTypeDef hadc1;
-
 I2C_HandleTypeDef hi2c1;
 
 TIM_HandleTypeDef htim1;
@@ -53,10 +51,11 @@ UART_HandleTypeDef huart1;
 DMA_HandleTypeDef hdma_usart1_rx;
 
 /* USER CODE BEGIN PV */
-uint8_t buffer_RX[32];
-uint8_t buffer_ring[64];
+uint8_t buffer_RX[80];
+uint8_t buffer_ring[128];
 hydrolib_RingQueue ringQueue;
-
+int16_t buffer_index;
+uint16_t data[12];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -68,8 +67,6 @@ static void MX_TIM1_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_USART1_UART_Init(void);
-static void MX_ADC1_Init(void);
-
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -114,22 +111,41 @@ int main(void)
   MX_TIM2_Init();
   MX_TIM3_Init();
   MX_USART1_UART_Init();
-  MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
- hydrolib_RingQueue_Init(&ringQueue, buffer_ring, sizeof(buffer_ring));
- HAL_UARTEx_ReceiveToIdle_DMA(&huart1, buffer_RX, 32);
+	Thruster_Init();
+//	hydrolib_RingQueue_Init(&ringQueue, buffer_ring, sizeof(buffer_ring));
+//	HAL_UARTEx_ReceiveToIdle_DMA(&huart1, buffer_RX, 80);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  while (1)
-  {
+	while (1) {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  ProcessUARTData();
+		HAL_UART_Receive(&huart1, buffer_RX, 52, 100);
+		for (uint8_t i = 0; i < 28; i++) {   // Searching for the packet header
+		    if ((buffer_RX[i] == 0xff) && (buffer_RX[i + 1] == 0xfd)) {
+		        buffer_index = i;
+		    }
+		}
 
-  }
+		data[0] = ((buffer_RX[3+ buffer_index] << 8) | (buffer_RX[2 + buffer_index] & 0xFF));
+		data[1] = ((buffer_RX[5+ buffer_index] << 8) | (buffer_RX[4 + buffer_index] & 0xFF));
+		data[2] = ((buffer_RX[7 + buffer_index] << 8) | (buffer_RX[6+ buffer_index] & 0xFF));
+		data[3] = ((buffer_RX[9 + buffer_index] << 8) | (buffer_RX[8+ buffer_index] & 0xFF));
+		data[4] = ((buffer_RX[11 + buffer_index] << 8) | (buffer_RX[10+ buffer_index] & 0xFF));
+		data[5] = ((buffer_RX[13 + buffer_index] << 8) | (buffer_RX[12+ buffer_index] & 0xFF));
+		data[6] = ((buffer_RX[15 + buffer_index] << 8) | (buffer_RX[14+ buffer_index] & 0xFF));
+		data[7] = ((buffer_RX[17 + buffer_index] << 8) | (buffer_RX[16+ buffer_index] & 0xFF));
+		data[8] = ((buffer_RX[19 + buffer_index] << 8) | (buffer_RX[18+ buffer_index] & 0xFF));
+		data[9] = ((buffer_RX[21 + buffer_index] << 8) | (buffer_RX[20+ buffer_index] & 0xFF));
+		data[10] = ((buffer_RX[23 + buffer_index] << 8) | (buffer_RX[22+ buffer_index] & 0xFF));
+		data[11] = ((buffer_RX[25 + buffer_index] << 8) | (buffer_RX[24+ buffer_index] & 0xFF));
+
+		Thruster_Set_Speed(data);
+
+	}
   /* USER CODE END 3 */
 }
 
@@ -141,7 +157,6 @@ void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
-  RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
 
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
@@ -171,59 +186,6 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_ADC;
-  PeriphClkInit.AdcClockSelection = RCC_ADCPCLK2_DIV6;
-  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
-  {
-    Error_Handler();
-  }
-}
-
-/**
-  * @brief ADC1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_ADC1_Init(void)
-{
-
-  /* USER CODE BEGIN ADC1_Init 0 */
-
-  /* USER CODE END ADC1_Init 0 */
-
-  ADC_ChannelConfTypeDef sConfig = {0};
-
-  /* USER CODE BEGIN ADC1_Init 1 */
-
-  /* USER CODE END ADC1_Init 1 */
-
-  /** Common config
-  */
-  hadc1.Instance = ADC1;
-  hadc1.Init.ScanConvMode = ADC_SCAN_DISABLE;
-  hadc1.Init.ContinuousConvMode = DISABLE;
-  hadc1.Init.DiscontinuousConvMode = DISABLE;
-  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
-  hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
-  hadc1.Init.NbrOfConversion = 1;
-  if (HAL_ADC_Init(&hadc1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  /** Configure Regular Channel
-  */
-  sConfig.Channel = ADC_CHANNEL_0;
-  sConfig.Rank = ADC_REGULAR_RANK_1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_1CYCLE_5;
-  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN ADC1_Init 2 */
-
-  /* USER CODE END ADC1_Init 2 */
-
 }
 
 /**
@@ -515,13 +477,20 @@ static void MX_DMA_Init(void)
   */
 static void MX_GPIO_Init(void)
 {
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
 /* USER CODE BEGIN MX_GPIO_Init_1 */
 /* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
+
+  /*Configure GPIO pin : PC15 */
+  GPIO_InitStruct.Pin = GPIO_PIN_15;
+  GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
@@ -529,37 +498,34 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
-void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
+//void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
+//
+//	if (huart->Instance == USART1) {  // Проверяем, что это нужный UART
+//		hydrolib_RingQueue_Push(&ringQueue, buffer_RX, Size); // Копируем данные в кольцевой буфер
+//
+//		// Перезапускаем UART DMA
+//		HAL_UARTEx_ReceiveToIdle_DMA(&huart1, buffer_RX, sizeof(buffer_RX));
+//	}
+//}
+//
+//void ProcessUARTData(){
+//	int16_t startIdx = hydrolib_RingQueue_Read2BytesLE(&ringQueue, 0XFFFD, 0);
+//
+//	while (startIdx >= 0) {
+//
+//		if (hydrolib_RingQueue_GetLength(&ringQueue) >= 26) { //воруем дату и кидаем ее на движки
+//			hydrolib_RingQueue_Drop(&ringQueue, startIdx);
 
-	if (huart->Instance == USART1) {  // Проверяем, что это нужный UART
-		hydrolib_RingQueue_Push(&ringQueue, buffer_RX, Size); // Копируем данные в кольцевой буфер
-
-		// Перезапускаем UART DMA
-		HAL_UARTEx_ReceiveToIdle_DMA(&huart1, buffer_RX, sizeof(buffer_RX));
-		__HAL_DMA_ENABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
-	}
-}
-
-void ProcessUARTData() {
-	int16_t startIdx = hydrolib_RingQueue_Find2BytesLE(&ringQueue, 0XFFFD, 0);
-
-	while (startIdx >= 0) {
-		uint8_t packet[12];
-
-		if (hydrolib_RingQueue_GetLength(&ringQueue) >= 15) { //воруем дату и кидаем ее на движки
-			hydrolib_RingQueue_Read(&ringQueue, packet, 12, startIdx);
-			Thruster_Set_Speed(packet);
-			hydrolib_RingQueue_Drop(&ringQueue, startIdx);
-		} else {
-			break;  // Ждём, когда будет 15 байтов
-		}
-
-		startIdx = hydrolib_RingQueue_Find2BytesLE(&ringQueue, 0XFFFD, 0); // Ищем следующий пакет
-	}
-
-}
-
-
+//			Thruster_Set_Speed(packet+2);
+//
+//		} else {
+//			break;  // Ждём, когда будет 15 байтов
+//		}
+//
+//		startIdx = hydrolib_RingQueue_Read2BytesLE(&ringQueue, 0XFFFD, 0); // �?щем следующий пакет
+//	}
+//
+//}
 /* USER CODE END 4 */
 
 /**
@@ -569,11 +535,10 @@ void ProcessUARTData() {
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
-  /* User can add his own implementation to report the HAL error return state */
-  __disable_irq();
-  while (1)
-  {
-  }
+	/* User can add his own implementation to report the HAL error return state */
+	__disable_irq();
+	while (1) {
+	}
   /* USER CODE END Error_Handler_Debug */
 }
 

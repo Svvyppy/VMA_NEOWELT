@@ -5,4 +5,3 @@
 void Thruster_Init(void);
 void Thruster_Stop(void);
 void Thruster_Set_Speed(uint16_t *speed);
-void Process_data(uint16_t *speed);

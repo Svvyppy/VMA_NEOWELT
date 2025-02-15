@@ -30,7 +30,7 @@ hydrolib_ReturnCode hydrolib_RingQueue_ReadByte(hydrolib_RingQueue *self, uint8_
 hydrolib_ReturnCode hydrolib_RingQueue_Read(hydrolib_RingQueue *self, void *data, uint16_t data_length, uint16_t shift);
 
 uint16_t hydrolib_RingQueue_FindByte(hydrolib_RingQueue *self, uint8_t target_byte, uint16_t shift);
-uint16_t hydrolib_RingQueue_Find2BytesLE(hydrolib_RingQueue *self, uint16_t target_bytes, uint16_t shift);
+hydrolib_ReturnCode hydrolib_RingQueue_Read2BytesLE(hydrolib_RingQueue *self, uint16_t *data, uint16_t shift);
 uint16_t hydrolib_RingQueue_Find4BytesLE(hydrolib_RingQueue *self, uint32_t target_bytes, uint16_t shift);
 
 uint16_t hydrolib_RingQueue_GetLength(hydrolib_RingQueue *self);
